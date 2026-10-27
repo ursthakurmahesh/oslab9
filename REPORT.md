@@ -1,6 +1,6 @@
 # Assignment 9 - Report
 
-**Q1 vmprint.** Added `sys_vmprint` (syscall 22), `vmprint()` in vm.c. It loops over page-directory entries below KERNBASE (like freevm), uses walkpgdir() per page, and prints virtual address, physical address and P/W/U. It ends with the count of valid user pages and page-table pages (1, plus the directory). pttest: 3 pages at start (text/data, a guard page with U=0, stack), 7 after sbrk(4*4096): exactly 4 new pages, PASS.
+**Q1 vmprint.** Added `sys_vmprint` (syscall 22), `vmprint()` in vm.c. It loops over page-directory entries below KERNBASE (like freevm), uses walkpgdir() per page, and prints virtual address, physical address and P/W/U. It ends with the count of valid user pages and page-table pages (1, plus the directory). A "valid user page" is present with PTE_U. The stack guard page (0x1000, present, U=0) is printed but marked guard and not counted. pttest: 2 user pages at start, 6 after sbrk(4*4096): exactly 4 new pages, PASS.
 
 **Q2 lazy allocation.** sys_sbrk now only increases `sz` for n>0 (shrinking still frees). copyuvm() skips never-allocated pages instead of panicking; deallocuvm() already skips non-present PTEs (commented). trap.c handles T_PGFLT: if rcr2() < sz and the page is not mapped, kalloc + memset + mappages(PTE_W|PTE_U), `pgfaults++`, resume; otherwise print pid and address and kill only that process. New `getfaults()` syscall. faulttest: sbrk(32*4096), touch 5 pages, 5 faults handled; a child touching an address above sz is killed, parent survives. mappages() was made non-static for use from trap.c.
 

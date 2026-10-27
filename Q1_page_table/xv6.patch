@@ -1,20 +1,24 @@
 --- a/vm.c	2026-10-27 15:17:21.430520123 +0530
-+++ b/vm.c	2026-10-27 15:17:47.537858505 +0530
-@@ -216,6 +216,41 @@
++++ b/vm.c	2026-10-27 15:22:53.252860552 +0530
+@@ -216,6 +216,52 @@
    return 0;
  }
  
-+// Assignment 9 Q1: print every valid user page of a page directory.
++// Assignment 9 Q1: print the user part of a page directory.
 +// Walks the two-level page table the same way freevm() does (outer loop
 +// over page-directory entries) and uses walkpgdir() for the inner lookup.
-+// Only user addresses (below KERNBASE) are visited.
++// Only addresses below KERNBASE are visited.
++// A "valid user page" is a present mapping with PTE_U set. A present
++// mapping without PTE_U (the stack guard page that exec() makes with
++// clearpteu) is printed and marked "guard (not user)" but is NOT counted.
 +// Returns the number of valid user pages.
 +int
 +vmprint(pde_t *pgdir)
 +{
 +  uint va;
 +  uint pdi;
-+  uint npages = 0;   // valid user pages
++  uint npages = 0;   // valid user pages (present and PTE_U)
++  uint nguard = 0;   // present but not user-accessible
 +  uint nptpages = 0; // second-level page-table pages in use
 +  pte_t *pte;
 +
@@ -28,13 +32,20 @@
 +      pte = walkpgdir(pgdir, (void*)va, 0);
 +      if(pte == 0 || !(*pte & PTE_P))
 +        continue;
-+      cprintf("  0x%x  0x%x  %d %d %d\n", va, PTE_ADDR(*pte),
++      cprintf("  0x%x  0x%x  %d %d %d", va, PTE_ADDR(*pte),
 +              (*pte & PTE_P) ? 1 : 0, (*pte & PTE_W) ? 1 : 0,
 +              (*pte & PTE_U) ? 1 : 0);
-+      npages++;
++      if(*pte & PTE_U){
++        npages++;
++        cprintf("\n");
++      } else {
++        nguard++;
++        cprintf("   <- guard (not user), not counted\n");
++      }
 +    }
 +  }
-+  cprintf("valid user pages: %d\n", npages);
++  cprintf("valid user pages (P and U): %d\n", npages);
++  cprintf("present but not user (guard): %d\n", nguard);
 +  cprintf("page-table pages: %d (plus 1 page-directory page)\n", nptpages);
 +  return npages;
 +}
@@ -42,23 +53,16 @@
  // Allocate page tables and physical memory to grow process from oldsz to
  // newsz, which need not be page aligned.  Returns new size or 0 on error.
  int
---- a/sysproc.c	2026-10-27 15:17:21.430356050 +0530
-+++ b/sysproc.c	2026-10-27 15:17:47.537793612 +0530
-@@ -56,6 +56,14 @@
-   return addr;
- }
- 
-+// Assignment 9 Q1: print the page table of the calling process.
-+// Returns the number of valid user pages.
-+int
-+sys_vmprint(void)
-+{
-+  return vmprint(myproc()->pgdir);
-+}
-+
- int
- sys_sleep(void)
- {
+--- a/defs.h	2026-10-27 15:17:21.429599034 +0530
++++ b/defs.h	2026-10-27 15:17:47.537746682 +0530
+@@ -177,6 +177,7 @@
+ char*           uva2ka(pde_t*, char*);
+ int             allocuvm(pde_t*, uint, uint);
+ int             deallocuvm(pde_t*, uint, uint);
++int             vmprint(pde_t*);   // Assignment 9 Q1
+ void            freevm(pde_t*);
+ void            inituvm(pde_t*, char*, uint);
+ int             loaduvm(pde_t*, char*, struct inode*, uint, uint);
 --- a/syscall.c	2026-10-27 15:17:21.430323890 +0530
 +++ b/syscall.c	2026-10-27 15:17:47.537465060 +0530
 @@ -84,6 +84,7 @@
@@ -84,16 +88,23 @@
  #define SYS_mkdir  20
  #define SYS_close  21
 +#define SYS_vmprint 22   // Assignment 9: new system call
---- a/defs.h	2026-10-27 15:17:21.429599034 +0530
-+++ b/defs.h	2026-10-27 15:17:47.537746682 +0530
-@@ -177,6 +177,7 @@
- char*           uva2ka(pde_t*, char*);
- int             allocuvm(pde_t*, uint, uint);
- int             deallocuvm(pde_t*, uint, uint);
-+int             vmprint(pde_t*);   // Assignment 9 Q1
- void            freevm(pde_t*);
- void            inituvm(pde_t*, char*, uint);
- int             loaduvm(pde_t*, char*, struct inode*, uint, uint);
+--- a/sysproc.c	2026-10-27 15:17:21.430356050 +0530
++++ b/sysproc.c	2026-10-27 15:17:47.537793612 +0530
+@@ -56,6 +56,14 @@
+   return addr;
+ }
+ 
++// Assignment 9 Q1: print the page table of the calling process.
++// Returns the number of valid user pages.
++int
++sys_vmprint(void)
++{
++  return vmprint(myproc()->pgdir);
++}
++
+ int
+ sys_sleep(void)
+ {
 --- a/user.h	2026-10-27 15:17:21.430464657 +0530
 +++ b/user.h	2026-10-27 15:17:47.537513882 +0530
 @@ -23,6 +23,7 @@

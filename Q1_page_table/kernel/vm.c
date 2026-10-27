@@ -216,17 +216,21 @@ loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz)
   return 0;
 }
 
-// Assignment 9 Q1: print every valid user page of a page directory.
+// Assignment 9 Q1: print the user part of a page directory.
 // Walks the two-level page table the same way freevm() does (outer loop
 // over page-directory entries) and uses walkpgdir() for the inner lookup.
-// Only user addresses (below KERNBASE) are visited.
+// Only addresses below KERNBASE are visited.
+// A "valid user page" is a present mapping with PTE_U set. A present
+// mapping without PTE_U (the stack guard page that exec() makes with
+// clearpteu) is printed and marked "guard (not user)" but is NOT counted.
 // Returns the number of valid user pages.
 int
 vmprint(pde_t *pgdir)
 {
   uint va;
   uint pdi;
-  uint npages = 0;   // valid user pages
+  uint npages = 0;   // valid user pages (present and PTE_U)
+  uint nguard = 0;   // present but not user-accessible
   uint nptpages = 0; // second-level page-table pages in use
   pte_t *pte;
 
@@ -240,13 +244,20 @@ vmprint(pde_t *pgdir)
       pte = walkpgdir(pgdir, (void*)va, 0);
       if(pte == 0 || !(*pte & PTE_P))
         continue;
-      cprintf("  0x%x  0x%x  %d %d %d\n", va, PTE_ADDR(*pte),
+      cprintf("  0x%x  0x%x  %d %d %d", va, PTE_ADDR(*pte),
               (*pte & PTE_P) ? 1 : 0, (*pte & PTE_W) ? 1 : 0,
               (*pte & PTE_U) ? 1 : 0);
-      npages++;
+      if(*pte & PTE_U){
+        npages++;
+        cprintf("\n");
+      } else {
+        nguard++;
+        cprintf("   <- guard (not user), not counted\n");
+      }
     }
   }
-  cprintf("valid user pages: %d\n", npages);
+  cprintf("valid user pages (P and U): %d\n", npages);
+  cprintf("present but not user (guard): %d\n", nguard);
   cprintf("page-table pages: %d (plus 1 page-directory page)\n", nptpages);
   return npages;
 }
