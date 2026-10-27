@@ -7,3 +7,10 @@
 **Q3 FIFO/LRU.** pagerepl.c simulates both, printing frames and hit/fault per reference. String 7 0 1 2 0 3 0 4 2 3 0 3 2 1 2 0 1 7 0 1, 3 frames: FIFO 15 faults, LRU 12 (matches expected). Table: 3 frames 15/12, 4 frames 10/8, 5 frames 9/7 (hit ratios 25/40, 50/60, 55/65 %).
 
 All outputs in each question's `output/` folder come from real runs.
+
+## Build and run evidence
+- Each question's patch was applied to a clean xv6-public checkout (eeb7b41) and built with the stock Makefile (`-Werror`): kernel, mkfs, fs.img and xv6.img all built with no errors.
+- QEMU was not available. xv6.img (boot disk) and fs.img were booted in the v86 x86 emulator (Node). The xv6 serial console (UART) was captured byte by byte and commands were typed into it. The .txt files are that raw capture; the PNGs are renders of the same text, labelled as real runs.
+- Q1 note: the guard page (0x1000, P=1 W=1 U=0) is shown, labelled guard, and excluded from the user count. Counts: 2 at start, 6 after sbrk(4*4096), so 4 new pages.
+- Q3 was also cross-checked by compiling pagerepl.c on Linux (same 15/12).
+- No illustrative or mock images were used. Everything shown was actually run.
